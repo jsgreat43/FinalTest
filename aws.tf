@@ -1,50 +1,62 @@
 resource "aws_vpc" "awsvpc" {
-  cidr_block           = "211.0.0.0/16"
+  cidr_block           = "192.168.1.0/24"
   enable_dns_hostnames = true
   enable_dns_support   = true
   instance_tenancy     = "default"
-  tags={name="user11"}
+  tags                 =
+    { 
+        name           = "dt2-vpc"
+    }
 }
 
 resource "aws_internet_gateway" "awsipg" {
-  vpc_id = "${aws_vpc.awsvpc.id}"
-  tags={name="user11"}
+  vpc_id               = "${aws_vpc.awsvpc.id}"
+  tags                 = 
+    { 
+      name             = "dt2-igw"
+    }
 }
 
 resource "aws_subnet" "public_1a" {
-  vpc_id            = "${aws_vpc.awsvpc.id}"
-  availability_zone = "ap-northeast-2a"
-  cidr_block        = "211.0.1.0/24"
-  tags={name="user11"}
+  vpc_id               = "${aws_vpc.awsvpc.id}"
+  availability_zone    = "ap-northeast-2a"
+  cidr_block           = "192.168.1.0/25"
+  tags                 =
+    { 
+       name            = "dt2-public-1a"
+    }
 }
 
-resource "aws_subnet" "public_1d" {
-  vpc_id            = "${aws_vpc.awsvpc.id}"
-  availability_zone = "ap-northeast-2c"
-  cidr_block        = "211.0.2.0/24"
-  tags={name="user11"}
+resource "aws_subnet" "public_1b" {
+  vpc_id               = "${aws_vpc.awsvpc.id}"
+  availability_zone    = "ap-northeast-2c"
+  cidr_block           = "192.168.1.128/25"
+  tags                 =
+    {  
+      name             = "dt2-public-1b"
+    }
 }
 
 resource "aws_eip" "awseip3" {
   vpc = false
-  tags={name="user11"}
+  tags={name="dt2-eip3"}
 }
 
 resource "aws_eip" "awseip4" {
   vpc = false
-  tags={name="user11"}
+  tags={name="dt2-eip4"}
 }
 
 resource "aws_nat_gateway" "natgate_1a" {
   allocation_id = "${aws_eip.awseip3.id}"
   subnet_id     = "${aws_subnet.public_1a.id}"
-  tags={name="user11"}
+  tags={name="dt2-ngw-1a"}
 }
 
-resource "aws_nat_gateway" "natgate_1d" {
+resource "aws_nat_gateway" "natgate_1b" {
   allocation_id = "${aws_eip.awseip4.id}"
-  subnet_id     = "${aws_subnet.public_1d.id}"
-  tags={name="user11"}
+  subnet_id     = "${aws_subnet.public_1b.id}"
+  tags={name="dt2-ngw-1b"}
 }
 
 resource "aws_route_table" "awsrtp" {
@@ -55,7 +67,7 @@ resource "aws_route_table" "awsrtp" {
     gateway_id = "${aws_internet_gateway.awsipg.id}"
   }
   
-  tags={name="user11"}
+  tags={name="dt2-rt"}
 }
 
 resource "aws_route_table_association" "awsrtp1a" {
@@ -64,8 +76,8 @@ resource "aws_route_table_association" "awsrtp1a" {
   
 }
 
-resource "aws_route_table_association" "awsrtp1d" {
-  subnet_id      = "${aws_subnet.public_1d.id}"
+resource "aws_route_table_association" "aiwsrtp1b" {
+  subnet_id      = "${aws_subnet.public_1b.id}"
   route_table_id = "${aws_route_table.awsrtp.id}"
   
 }
@@ -87,7 +99,7 @@ resource "aws_default_security_group" "awssecurity" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   
-  tags={name="user11"}
+  tags={name="dt2-dsg"}
 } 
 
 resource "aws_default_network_acl" "awsnetworkacl" {
@@ -113,10 +125,10 @@ resource "aws_default_network_acl" "awsnetworkacl" {
 
   subnet_ids = [
     "${aws_subnet.public_1a.id}",
-    "${aws_subnet.public_1d.id}",
+    "${aws_subnet.public_1b.id}",
   ]
   
-  tags={name="user11"}
+  tags={name="dt2-nacl"}
 }
 
 variable "amazon_linux" {
@@ -150,14 +162,14 @@ resource "aws_security_group" "webserverSecurutyGroup" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  tags={name="user11"}
+  tags={name="dt2-websg"}
 }
 
 resource "aws_instance" "web1" {
   ami               = "${var.amazon_linux}"
   availability_zone = "ap-northeast-2a"
   instance_type     = "t2.micro"
-  key_name = "user11-key"
+  key_name = "sre-aws-mgmtvm-test"
   vpc_security_group_ids = [
     "${aws_security_group.webserverSecurutyGroup.id}",
     "${aws_default_security_group.awssecurity.id}",
@@ -165,38 +177,38 @@ resource "aws_instance" "web1" {
 
   subnet_id                   = "${aws_subnet.public_1a.id}"
   associate_public_ip_address = true
-  tags={name="user11"}
+  tags={name="dt2-web1"}
 }
 
 resource "aws_instance" "web2" {
   ami               = "${var.amazon_linux}"
   availability_zone = "ap-northeast-2c"
   instance_type     = "t2.micro"
-  key_name = "user11-key"	
+  key_name = "sre-aws-mgmtvm-test"	
   vpc_security_group_ids = [
     "${aws_security_group.webserverSecurutyGroup.id}",
     "${aws_default_security_group.awssecurity.id}",
   ]
 				
-  subnet_id                   = "${aws_subnet.public_1d.id}"
+  subnet_id                   = "${aws_subnet.public_1b.id}"
   associate_public_ip_address = true
-  tags={name="user11"}
+  tags={name="dt2-web2"}
 }
 	
 resource "aws_alb" "frontend" {
-  name            = "alb2user11"
+  name            = "dt2-alb"
   internal        = false
   security_groups = ["${aws_security_group.webserverSecurutyGroup.id}"]
   subnets         = [
     "${aws_subnet.public_1a.id}",
-    "${aws_subnet.public_1d.id}"
+    "${aws_subnet.public_1b.id}"
   ]
   lifecycle { create_before_destroy = true }
-  tags={name="user11"}
+  tags={name="dt2-alb"}
 }
 
 resource "aws_alb_target_group" "frontendalb" {
-  name     = "frontendtargetgroupuser11"
+  name     = "dt2-alb-tg"
   port     = 80
   protocol = "HTTP"
   vpc_id   = "${aws_vpc.awsvpc.id}"
@@ -207,7 +219,7 @@ resource "aws_alb_target_group" "frontendalb" {
     healthy_threshold   = 3
     unhealthy_threshold = 3				
   }
-  tags={name="user11"}
+  tags={name="dt2-alb-tg"}
 }
 
 resource "aws_alb_target_group_attachment" "frontend1" {
